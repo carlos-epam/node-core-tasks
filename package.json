@@ -1,7 +1,12 @@
 {
   "devDependencies": {
     "nodemon": "^3.1.4"
-  }, "scripts": {
-    "task1": "node task1.js"
+  },
+  "scripts": {
+    "task1": "node task1.js",
+    "task3": "node task3.js"
+  },
+  "dependencies": {
+    "csvtojson": "^2.0.10"
   }
 }
