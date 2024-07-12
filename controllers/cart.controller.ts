@@ -20,17 +20,37 @@ export const updateCart = async (req: Request, res: Response) => {
     }
 
     const userId = req.header('x-user-id') as string;
-    const updatedCart = await cartService.updateCart(userId, req.body);
-    res.json({ data: { cart: updatedCart, total: cartService.calculateTotal(updatedCart) }, error: null });
+    const updatedCart = await cartService.updateCart(userId, req.body.items);
+    
+    if (!updatedCart) {
+      return res.status(404).json({ data: null, error: { message: 'Cart not found' } });
+    }
+
+    res.json({ 
+      data: { 
+        cart: updatedCart, 
+        total: cartService.calculateTotal(updatedCart) 
+      }, 
+      error: null 
+    });
   } catch (error) {
-    res.status(500).json({ data: null, error: { message: 'Internal Server error' } });
+    if (error instanceof Error) {
+      res.status(400).json({ data: null, error: { message: error.message } });
+    } else {
+      res.status(500).json({ data: null, error: { message: 'Internal Server error' } });
+    }
   }
 };
 
 export const emptyCart = async (req: Request, res: Response) => {
   try {
     const userId = req.header('x-user-id') as string;
-    await cartService.emptyCart(userId);
+    const emptiedCart = await cartService.emptyCart(userId);
+    
+    if (!emptiedCart) {
+      return res.status(404).json({ data: null, error: { message: 'Cart not found' } });
+    }
+
     res.json({ data: { success: true }, error: null });
   } catch (error) {
     res.status(500).json({ data: null, error: { message: 'Internal Server error' } });

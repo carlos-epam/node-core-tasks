@@ -1,23 +1,34 @@
-import { Cart } from '../models/cart.model';
+import { Cart, ICart, ICartItem } from '../models/cart.model';
 
-let carts: Cart[] = [];
-
-export const findByUserId = async (userId: string): Promise<Cart | undefined> => {
-  return carts.find(cart => cart.id === userId);
+export const findByUserId = async (userId: string): Promise<ICart | null> => {
+  return Cart.findOne({ userId }).populate('items.product').exec();
 };
 
-export const create = async (userId: string): Promise<Cart> => {
-  const newCart: Cart = { id: userId, items: [] };
-  carts.push(newCart);
-  return newCart;
+export const create = async (userId: string): Promise<ICart> => {
+  const cart = new Cart({ userId, items: [] });
+  return cart.save();
 };
 
-export const update = async (cart: Cart): Promise<Cart> => {
-  const index = carts.findIndex(c => c.id === cart.id);
-  if (index !== -1) {
-    carts[index] = cart;
-  } else {
-    carts.push(cart);
-  }
-  return cart;
+export const update = async (userId: string, items: ICartItem[]): Promise<ICart | null> => {
+  return Cart.findOneAndUpdate({ userId }, { items }, { new: true }).populate('items.product').exec();
+};
+
+export const addItem = async (userId: string, item: ICartItem): Promise<ICart | null> => {
+  return Cart.findOneAndUpdate(
+    { userId },
+    { $push: { items: item } },
+    { new: true, upsert: true }
+  ).populate('items.product').exec();
+};
+
+export const removeItem = async (userId: string, productId: string): Promise<ICart | null> => {
+  return Cart.findOneAndUpdate(
+    { userId },
+    { $pull: { items: { product: productId } } },
+    { new: true }
+  ).populate('items.product').exec();
+};
+
+export const emptyCart = async (userId: string): Promise<ICart | null> => {
+  return Cart.findOneAndUpdate({ userId }, { items: [] }, { new: true }).populate('items.product').exec();
 };

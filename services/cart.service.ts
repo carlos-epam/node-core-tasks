@@ -1,10 +1,10 @@
 import * as cartRepository from '../repositories/cart.repository';
-import * as productRepository from '../repositories/prorduct.repository';
-import { Cart, CartItem } from '../models/cart.model';
-import { Order } from '../models/order.model';
-import { v4 as uuidv4 } from 'uuid';
+import * as productRepository from '../repositories/product.repository';
+import { ICart, ICartItem } from '../models/cart.model';
+import { IOrder } from '../models/order.model';
+import { createOrder } from './order.service';
 
-export const getOrCreateCart = async (userId: string): Promise<Cart> => {
+export const getOrCreateCart = async (userId: string): Promise<ICart> => {
   let cart = await cartRepository.findByUserId(userId);
   if (!cart) {
     cart = await cartRepository.create(userId);
@@ -12,48 +12,45 @@ export const getOrCreateCart = async (userId: string): Promise<Cart> => {
   return cart;
 };
 
-export const updateCart = async (userId: string, updateData: { productId: string; count: number }): Promise<Cart> => {
+export const updateCart = async (userId: string, items: ICartItem[]): Promise<ICart | null> => {
   const cart = await getOrCreateCart(userId);
-  const product = await productRepository.findById(updateData.productId);
+  return cartRepository.update(userId, items);
+};
 
+export const addItemToCart = async (userId: string, productId: string, count: number): Promise<ICart | null> => {
+  const product = await productRepository.findById(productId);
   if (!product) {
     throw new Error('Product not found');
   }
-
-  const existingItemIndex = cart.items.findIndex(item => item.product.id === updateData.productId);
-
-  if (existingItemIndex !== -1) {
-    if (updateData.count === 0) {
-      cart.items.splice(existingItemIndex, 1);
-    } else {
-      cart.items[existingItemIndex].count = updateData.count;
-    }
-  } else if (updateData.count > 0) {
-    cart.items.push({ product, count: updateData.count });
-  }
-
-  return cartRepository.update(cart);
+  return cartRepository.addItem(userId, { product: productId, count });
 };
 
-export const calculateTotal = (cart: Cart): number => {
-  return cart.items.reduce((total, item) => total + item.product.price * item.count, 0);
+export const removeItemFromCart = async (userId: string, productId: string): Promise<ICart | null> => {
+  return cartRepository.removeItem(userId, productId);
 };
 
-export const emptyCart = async (userId: string): Promise<void> => {
-  await cartRepository.update({ id: userId, items: [] });
+export const calculateTotal = (cart: ICart): number => {
+  return cart.items.reduce((total, item) => {
+    const price = typeof item.product === 'string'
+      ? 0 
+      : item.product.price;
+    return total + (price * item.count);
+  }, 0);
 };
 
-export const checkout = async (userId: string): Promise<Order> => {
+export const emptyCart = async (userId: string): Promise<ICart | null> => {
+  return cartRepository.emptyCart(userId);
+};
+
+export const checkout = async (userId: string): Promise<IOrder> => {
   const cart = await getOrCreateCart(userId);
 
   if (cart.items.length === 0) {
     throw new Error('Cart is empty');
   }
 
-  const order: Order = {
-    id: uuidv4(),
+  const order: Partial<IOrder> = {
     userId,
-    cartId: cart.id,
     items: cart.items,
     payment: {
       type: 'paypal',
@@ -69,8 +66,8 @@ export const checkout = async (userId: string): Promise<Order> => {
     total: calculateTotal(cart)
   };
 
-  
+  const createdOrder = await createOrder(order);
   await emptyCart(userId);
 
-  return order;
+  return createdOrder;
 };
